@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/jankaczmarski/go-s3/aws"
 	"github.com/jankaczmarski/go-s3/gcp"
 )
 
@@ -28,20 +29,29 @@ func run(ctx context.Context, worker storageWorker) {
 }
 
 func main() {
+	// GCP testing
 	ctx := context.Background()
 	worker, err := gcp.NewWorker(ctx, projectID)
 	if err != nil {
 		log.Fatalf("Failed to create NewWorker for gcp: %v", err)
 	}
 
-	client := worker.Client
-	defer client.Close()
+	defer worker.Close()
 
+	fmt.Println("Running GCP worker")
+	run(ctx, worker)
+	fmt.Println("GCP worker finished running")
+
+	// AWS testing
+	fmt.Println("Setup AWS worker")
+
+	ctxAws := context.Background()
+	workerAws, err := aws.NewWorker(ctxAws)
 	if err != nil {
-		log.Fatalf("Creation of new GcpWorker failed with error: %v", err)
+		log.Fatalf("Failed to create NewWorker for AWS: %v", err)
 	}
 
-	fmt.Println("Running worker")
-	run(ctx, worker)
-	fmt.Println("Worker finished running")
+	fmt.Println("Running AWS worker")
+	run(ctxAws, workerAws)
+	fmt.Println("AWS worker finished running")
 }

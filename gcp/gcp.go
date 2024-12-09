@@ -11,7 +11,7 @@ import (
 )
 
 type GcpWorker struct {
-	Client    *storage.Client
+	client    *storage.Client
 	ProjectID string
 }
 
@@ -22,9 +22,17 @@ func NewWorker(ctx context.Context, projectID string) (*GcpWorker, error) {
 	}
 
 	return &GcpWorker{
-		Client:    client,
+		client:    client,
 		ProjectID: projectID,
 	}, nil
+}
+
+func (worker *GcpWorker) Close() error {
+	err := worker.client.Close()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (worker *GcpWorker) Run() {
@@ -43,7 +51,7 @@ func (worker *GcpWorker) Run() {
 }
 
 func (worker *GcpWorker) CreateBucket(bucketID string, ctx context.Context) error {
-	client := worker.Client
+	client := worker.client
 	projectID := worker.ProjectID
 	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
@@ -59,7 +67,7 @@ func (worker *GcpWorker) CreateBucket(bucketID string, ctx context.Context) erro
 }
 
 func (worker *GcpWorker) ListBuckets(ctx context.Context) ([]string, error) {
-	client := worker.Client
+	client := worker.client
 	projectID := worker.ProjectID
 
 	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
