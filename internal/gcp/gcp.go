@@ -2,14 +2,18 @@ package gcp
 
 import (
 	"context"
-	"fmt"
-	"log"
 	"time"
+
+	mytypes "github.com/jankaczmarski/go-s3/pkg/types"
 
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/iterator"
 )
 
+type GcpBucket struct {
+	bucketID  string
+	projectID string
+}
 type GcpWorker struct {
 	client    *storage.Client
 	projectID string
@@ -27,30 +31,7 @@ func NewWorker(ctx context.Context, projectID string) (*GcpWorker, error) {
 	}, nil
 }
 
-func (worker *GcpWorker) Close() error {
-	err := worker.client.Close()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (worker *GcpWorker) Run() {
-	// context for working with API's, sender sends context and receiver receieves it,
-	// imo it's a context of certain api calls, more info here: https://pkg.go.dev/context
-	ctx := context.Background()
-
-	buckets, err := worker.ListBuckets(ctx)
-	if err != nil {
-		log.Fatalf("Failed to listBuckets: %v", err)
-	}
-
-	for i, tmpBucketName := range buckets {
-		fmt.Printf("ID-%d: BucketName: %s\n", i, tmpBucketName)
-	}
-}
-
-func (worker *GcpWorker) CreateBucket(bucketID string, ctx context.Context) error {
+func NewGcpBucket(ctx context.Context, bucketID string, worker *GcpWorker) (*GcpBucket, error) {
 	client := worker.client
 	projectID := worker.projectID
 	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
@@ -59,11 +40,31 @@ func (worker *GcpWorker) CreateBucket(bucketID string, ctx context.Context) erro
 	bucket := client.Bucket(bucketID)
 
 	if err := bucket.Create(ctx, projectID, nil); err != nil {
-		return err
+		return nil, err
 	}
 
-	fmt.Printf("Bucket: %v created.\n", bucket.BucketName())
+	return &GcpBucket{
+		bucketID:  bucketID,
+		projectID: worker.projectID,
+	}, nil
+}
+
+func (worker *GcpWorker) Close() error {
+	err := worker.client.Close()
+	if err != nil {
+		return err
+	}
 	return nil
+}
+
+func (worker *GcpWorker) CreateBucket(ctx context.Context, bucketID string) (*mytypes.Bucket, error) {
+	gcpBucket, err := NewGcpBucket(ctx, bucketID, worker)
+	if err != nil {
+		return nil, err
+	}
+	return &mytypes.Bucket{
+		Name: gcpBucket.bucketID,
+	}, nil
 }
 
 func (worker *GcpWorker) ListBuckets(ctx context.Context) ([]string, error) {

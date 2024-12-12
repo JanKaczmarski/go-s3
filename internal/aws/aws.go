@@ -16,27 +16,30 @@ import (
 
 type AwsWorker struct {
 	client *s3.Client
+	region string
 }
 
 type AwsBucket struct {
 	bucketName string
+	region     string
 }
 
-func NewWorker(ctx context.Context) (*AwsWorker, error) {
+func NewWorker(ctx context.Context, profile string) (*AwsWorker, error) {
 	cfg, err := config.LoadDefaultConfig(ctx,
-		config.WithSharedConfigProfile("jank-private"),
+		config.WithSharedConfigProfile(profile),
 	)
 	if err != nil {
 		return nil, err
 	}
 	return &AwsWorker{
 		client: s3.NewFromConfig(cfg),
+		region: cfg.Region,
 	}, nil
 }
 
 // TODO: jk: this func creates bucket if it's not present. Make distinct function for each functionality
 // One for getting new bucket and one for creating bucket
-func NewAwsBucket(ctx context.Context, bucketName, region string, worker *AwsWorker) (*AwsBucket, error) {
+func NewAwsBucket(ctx context.Context, bucketName string, worker *AwsWorker) (*AwsBucket, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
 
@@ -44,7 +47,7 @@ func NewAwsBucket(ctx context.Context, bucketName, region string, worker *AwsWor
 		// aws only accepts *string and this is how you do this per aws docs
 		Bucket: aws.String(bucketName),
 		CreateBucketConfiguration: &types.CreateBucketConfiguration{
-			LocationConstraint: types.BucketLocationConstraint(region),
+			LocationConstraint: types.BucketLocationConstraint(worker.region),
 		},
 	})
 
@@ -69,17 +72,17 @@ func NewAwsBucket(ctx context.Context, bucketName, region string, worker *AwsWor
 
 	return &AwsBucket{
 		bucketName: bucketName,
+		region:     worker.region,
 	}, err
 }
 
-func (worker *AwsWorker) CreateBucket(ctx context.Context, name, region string) (*mytypes.Bucket, error) {
-	awsBucket, err := NewAwsBucket(ctx, name, region, worker)
+func (worker *AwsWorker) CreateBucket(ctx context.Context, name string) (*mytypes.Bucket, error) {
+	awsBucket, err := NewAwsBucket(ctx, name, worker)
 	if err != nil {
 		return nil, err
 	}
 	return &mytypes.Bucket{
-		Name:   awsBucket.bucketName,
-		Region: region,
+		Name: awsBucket.bucketName,
 	}, nil
 }
 
